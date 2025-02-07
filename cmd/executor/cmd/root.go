@@ -35,7 +35,6 @@ import (
 	"github.com/GoogleContainerTools/kaniko/pkg/timing"
 	"github.com/GoogleContainerTools/kaniko/pkg/util"
 	"github.com/GoogleContainerTools/kaniko/pkg/util/proc"
-	"github.com/containerd/containerd/platforms"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/pkg/errors"
@@ -97,15 +96,6 @@ func validateFlags() {
 		}
 	}
 
-	// Default the custom platform flag to our current platform, and validate it.
-	if opts.CustomPlatform == "" {
-		spec := platforms.Normalize(platforms.DefaultSpec())
-		// Fix for armhf
-		if spec.Architecture == "arm" && spec.Variant == "v8" {
-			spec.Variant = "v7"
-		}
-		opts.CustomPlatform = platforms.Format(spec)
-	}
 	if _, err := v1.ParsePlatform(opts.CustomPlatform); err != nil {
 		logrus.Fatalf("Invalid platform %q: %v", opts.CustomPlatform, err)
 	}
@@ -237,7 +227,7 @@ func addKanikoOptionsFlags() {
 	RootCmd.PersistentFlags().StringVarP(&opts.Bucket, "bucket", "b", "", "Name of the GCS bucket from which to access build context as tarball.")
 	RootCmd.PersistentFlags().VarP(&opts.Destinations, "destination", "d", "Registry the final image should be pushed to. Set it repeatedly for multiple destinations.")
 	RootCmd.PersistentFlags().StringVarP(&opts.SnapshotMode, "snapshot-mode", "", "full", "Change the file attributes inspected during snapshotting")
-	RootCmd.PersistentFlags().StringVarP(&opts.CustomPlatform, "custom-platform", "", "", "Specify the build platform if different from the current host")
+	RootCmd.PersistentFlags().StringVarP(&opts.CustomPlatform, "custom-platform", "", config.DefaultPlatform(), "Specify the build platform if different from the current host")
 	RootCmd.PersistentFlags().VarP(&opts.BuildArgs, "build-arg", "", "This flag allows you to pass in ARG values at build time. Set it repeatedly for multiple values.")
 	RootCmd.PersistentFlags().BoolVarP(&opts.Insecure, "insecure", "", false, "Push to insecure registry using plain HTTP")
 	RootCmd.PersistentFlags().BoolVarP(&opts.SkipTLSVerify, "skip-tls-verify", "", false, "Push to insecure registry ignoring TLS verify")
@@ -395,18 +385,29 @@ func resolveEnvironmentBuildArgs(arguments []string, resolver func(string) strin
 }
 
 // addTargetBuildArgs adds target build args to the arguments if they are not already present
-func addTargetBuildArgs(arguments []string, platform string) []string {
-	spec, err := v1.ParsePlatform(platform)
+func addTargetBuildArgs(arguments []string, targetPlatform string) []string {
+	targetSpec, err := v1.ParsePlatform(targetPlatform)
 	if err != nil {
-		logrus.Warnf("Error parsing platform %s: %v", platform, err)
+		logrus.Warnf("Error parsing platform %s: %v", targetPlatform, err)
+		return arguments
+	}
+
+	buildPlatform := config.DefaultPlatform()
+	buildSpec, err := v1.ParsePlatform(buildPlatform)
+	if err != nil {
+		logrus.Warnf("Error parsing platform %s: %v", buildPlatform, err)
 		return arguments
 	}
 
 	targetArgs := map[string]string{
-		"TARGETPLATFORM": platform,
-		"TARGETOS":       spec.OS,
-		"TARGETARCH":     spec.Architecture,
-		"TARGETVARIANT":  spec.Variant,
+		"BUILDPLATFORM":  buildPlatform,
+		"BUILDOS":        buildSpec.OS,
+		"BUILDARCH":      buildSpec.Architecture,
+		"BUILDVARIANT":   buildSpec.Variant,
+		"TARGETPLATFORM": targetPlatform,
+		"TARGETOS":       targetSpec.OS,
+		"TARGETARCH":     targetSpec.Architecture,
+		"TARGETVARIANT":  targetSpec.Variant,
 	}
 
 outer:

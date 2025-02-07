@@ -23,8 +23,8 @@ import re
 import sys
 
 
-SKIPPED_DIRS = ["Godeps", "third_party", ".git", "vendor", "examples", "testdata", "deploy"]
-SKIPPED_FILES = ["install_golint.sh", "build-images.sh", "push-images.sh"]
+SKIPPED_DIRS = ["Godeps", "third_party", ".git", "vendor", "examples", "testdata"]
+SKIPPED_FILES = ["install_golint.sh", "build-images.sh", "push-images.sh", "platform.go", "Dockerfile"]
 
 parser = argparse.ArgumentParser()
 parser.add_argument("filenames", help="list of files to check, all files if unspecified", nargs='*')
