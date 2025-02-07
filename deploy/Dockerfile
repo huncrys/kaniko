@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+# check=skip=SecretsUsedInArgOrEnv,error=true
 # Copyright 2018 Google, Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,18 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.22 AS builder
+ARG BUILDPLATFORM
+
+FROM --platform=$BUILDPLATFORM golang:1.22 AS builder
 WORKDIR /src
 
 # This arg is passed by docker buildx & contains the target CPU architecture (e.g., amd64, arm64, etc.)
 ARG TARGETARCH
 ARG TARGETOS
+ARG TARGETVARIANT
 
-ENV GOARCH=$TARGETARCH
-ENV GOOS=$TARGETOS
+ENV \
+  GOARCH=$TARGETARCH \
+  GOOS=$TARGETOS \
+  CGO_ENABLED=0
 
-ENV CGO_ENABLED=0
-ENV GOBIN=/usr/local/bin
+RUN (test -n "$TARGETVARIANT" && go env -w GOARM=${TARGETVARIANT#v}) || true
 
 # Add .docker config dir
 RUN mkdir -p /kaniko/.docker
@@ -54,8 +60,10 @@ RUN \
   --mount=type=cache,target=/go/pkg \
   make out/executor out/warmer
 
+RUN mv /go/bin/*/docker-credential-* /kaniko/ || mv /go/bin/docker-credential-* /kaniko/
+
 # Generate latest ca-certificates
-FROM debian:bullseye-slim AS certs
+FROM --platform=$BUILDPLATFORM debian:bullseye-slim AS certs
 RUN apt update && apt install -y ca-certificates
 
 # use musl busybox since it's staticly compiled on all platforms
@@ -68,21 +76,20 @@ RUN --mount=from=busybox,dst=/usr/ ["busybox", "sh", "-c", "mkdir -p /kaniko && 
 
 COPY --from=certs /etc/ssl/certs/ca-certificates.crt /kaniko/ssl/certs/
 COPY files/nsswitch.conf /etc/nsswitch.conf
-ENV HOME /root
-ENV USER root
-ENV PATH /usr/local/bin:/kaniko
-ENV SSL_CERT_DIR=/kaniko/ssl/certs
+ENV \
+  HOME=/root \
+  USER=root \
+  PATH=/usr/local/bin:/kaniko \
+  SSL_CERT_DIR=/kaniko/ssl/certs
 
 FROM kaniko-base-slim AS kaniko-base
 
-COPY --from=builder --chown=0:0 /usr/local/bin/docker-credential-gcr /kaniko/docker-credential-gcr
-COPY --from=builder --chown=0:0 /usr/local/bin/docker-credential-ecr-login /kaniko/docker-credential-ecr-login
-COPY --from=builder --chown=0:0 /usr/local/bin/docker-credential-acr-env /kaniko/docker-credential-acr-env
+COPY --from=builder --chown=0:0 /kaniko/ /kaniko/
 
-COPY --from=builder /kaniko/.docker /kaniko/.docker
+ENV \
+  DOCKER_CONFIG=/kaniko/.docker/ \
+  DOCKER_CREDENTIAL_GCR_CONFIG=/kaniko/.config/gcloud/docker_credential_gcr_config.json
 
-ENV DOCKER_CONFIG /kaniko/.docker/
-ENV DOCKER_CREDENTIAL_GCR_CONFIG /kaniko/.config/gcloud/docker_credential_gcr_config.json
 WORKDIR /workspace
 
 ### FINAL STAGES ###
@@ -101,7 +108,7 @@ ENTRYPOINT ["/kaniko/executor"]
 
 FROM kaniko-executor AS kaniko-debug
 
-ENV PATH /usr/local/bin:/kaniko:/busybox
+ENV PATH=/usr/local/bin:/kaniko:/busybox
 
 COPY --from=builder /src/out/warmer /kaniko/warmer
 
