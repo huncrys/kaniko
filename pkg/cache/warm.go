@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleContainerTools/kaniko/pkg/dockerfile"
 	"github.com/GoogleContainerTools/kaniko/pkg/image/remote"
 	"github.com/GoogleContainerTools/kaniko/pkg/util"
+	"github.com/containerd/containerd/platforms"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
@@ -35,11 +36,16 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type Image struct {
+	Reference string
+	Platform  string
+}
+
 // WarmCache populates the cache
 func WarmCache(opts *config.WarmerOptions) error {
-	var dockerfileImages []string
+	var dockerfileImages []Image
+	var images []Image
 	cacheDir := opts.CacheDir
-	images := opts.Images
 
 	// if opts.image is empty,we need to parse dockerfilepath to get images list
 	if opts.DockerfilePath != "" {
@@ -47,6 +53,13 @@ func WarmCache(opts *config.WarmerOptions) error {
 		if dockerfileImages, err = ParseDockerfile(opts); err != nil {
 			return errors.Wrap(err, "failed to parse Dockerfile")
 		}
+	}
+
+	for _, image := range opts.Images {
+		images = append(images, Image{
+			Reference: image,
+			Platform:  opts.CustomPlatform,
+		})
 	}
 
 	// TODO: Implement deduplication logic later.
@@ -72,7 +85,7 @@ func WarmCache(opts *config.WarmerOptions) error {
 }
 
 // Download image in temporary files then move files to final destination
-func warmToFile(cacheDir, img string, opts *config.WarmerOptions) error {
+func warmToFile(cacheDir string, img Image, opts *config.WarmerOptions) error {
 	f, err := os.CreateTemp(cacheDir, "warmingImage.*")
 	if err != nil {
 		return err
@@ -142,13 +155,26 @@ type Warmer struct {
 
 // Warm retrieves a Docker image and populates the supplied buffer with the image content and manifest
 // or returns an AlreadyCachedErr if the image is present in the cache.
-func (w *Warmer) Warm(image string, opts *config.WarmerOptions) (v1.Hash, error) {
-	cacheRef, err := name.ParseReference(image, name.WeakValidation)
+func (w *Warmer) Warm(image Image, opts *config.WarmerOptions) (v1.Hash, error) {
+	cacheRef, err := name.ParseReference(image.Reference, name.WeakValidation)
 	if err != nil {
 		return v1.Hash{}, errors.Wrapf(err, "Failed to verify image name: %s", image)
 	}
 
-	img, err := w.Remote(image, opts.RegistryOptions, opts.CustomPlatform)
+	currentPlatform := image.Platform
+	if currentPlatform == "" {
+		currentPlatform = opts.CustomPlatform
+	}
+
+	if currentPlatform != "" {
+		spec, err := platforms.Parse(currentPlatform)
+		if err != nil {
+			return v1.Hash{}, err
+		}
+		currentPlatform = platforms.Format(platforms.Normalize(spec))
+	}
+
+	img, err := w.Remote(image.Reference, opts.RegistryOptions, currentPlatform)
 	if err != nil || img == nil {
 		return v1.Hash{}, errors.Wrapf(err, "Failed to retrieve image: %s", image)
 	}
@@ -182,10 +208,10 @@ func (w *Warmer) Warm(image string, opts *config.WarmerOptions) (v1.Hash, error)
 	return digest, nil
 }
 
-func ParseDockerfile(opts *config.WarmerOptions) ([]string, error) {
+func ParseDockerfile(opts *config.WarmerOptions) ([]Image, error) {
 	var err error
 	var d []uint8
-	var baseNames []string
+	var images []Image
 	match, _ := regexp.MatchString("^https?://", opts.DockerfilePath)
 	if match {
 		response, e := http.Get(opts.DockerfilePath) //nolint:noctx
@@ -211,11 +237,21 @@ func ParseDockerfile(opts *config.WarmerOptions) ([]string, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, fmt.Sprintf("resolving base name %s", s.BaseName))
 		}
+		resolvedPlatform, err := util.ResolveEnvironmentReplacement(s.Platform, opts.BuildArgs, false)
+		if err != nil {
+			return nil, errors.Wrap(err, fmt.Sprintf("resolving platform %s", s.Platform))
+		}
 		if s.BaseName != resolvedBaseName {
 			stages[i].BaseName = resolvedBaseName
 		}
-		baseNames = append(baseNames, resolvedBaseName)
+		if s.Platform != resolvedPlatform {
+			stages[i].Platform = resolvedPlatform
+		}
+		images = append(images, Image{
+			Reference: resolvedBaseName,
+			Platform:  resolvedPlatform,
+		})
 	}
-	return baseNames, nil
+	return images, nil
 
 }

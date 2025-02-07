@@ -87,6 +87,9 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
+		resolveEnvironmentBuildArgs(opts.BuildArgs, os.Getenv)
+		opts.BuildArgs = addTargetBuildArgs(opts.BuildArgs, opts.CustomPlatform)
+
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
@@ -127,7 +130,12 @@ func addKanikoOptionsFlags() {
 
 	// Default the custom platform flag to our current platform, and validate it.
 	if opts.CustomPlatform == "" {
-		opts.CustomPlatform = platforms.Format(platforms.Normalize(platforms.DefaultSpec()))
+		spec := platforms.Normalize(platforms.DefaultSpec())
+		// Fix for armhf
+		if spec.Architecture == "arm" && spec.Variant == "v8" {
+			spec.Variant = "v7"
+		}
+		opts.CustomPlatform = platforms.Format(spec)
 	}
 	if _, err := v1.ParsePlatform(opts.CustomPlatform); err != nil {
 		logrus.Fatalf("Invalid platform %q: %v", opts.CustomPlatform, err)
@@ -165,4 +173,44 @@ func isURL(path string) bool {
 func exit(err error) {
 	fmt.Println(err)
 	os.Exit(1)
+}
+
+// resolveEnvironmentBuildArgs replace build args without value by the same named environment variable
+func resolveEnvironmentBuildArgs(arguments []string, resolver func(string) string) {
+	for index, argument := range arguments {
+		i := strings.Index(argument, "=")
+		if i < 0 {
+			value := resolver(argument)
+			arguments[index] = fmt.Sprintf("%s=%s", argument, value)
+		}
+	}
+}
+
+// addTargetBuildArgs adds target build args to the arguments if they are not already present
+func addTargetBuildArgs(arguments []string, platform string) []string {
+	spec, err := v1.ParsePlatform(platform)
+	if err != nil {
+		logrus.Warnf("Error parsing platform %s: %v", platform, err)
+		return arguments
+	}
+
+	targetArgs := map[string]string{
+		"TARGETPLATFORM": platform,
+		"TARGETOS":       spec.OS,
+		"TARGETARCH":     spec.Architecture,
+		"TARGETVARIANT":  spec.Variant,
+	}
+
+outer:
+	for key, value := range targetArgs {
+		for _, candidate := range arguments {
+			if strings.HasPrefix(candidate, key+"=") {
+				continue outer
+			}
+		}
+
+		arguments = append(arguments, fmt.Sprintf("%s=%s", key, value))
+	}
+
+	return arguments
 }

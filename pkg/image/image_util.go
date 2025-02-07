@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleContainerTools/kaniko/pkg/image/remote"
 	"github.com/GoogleContainerTools/kaniko/pkg/timing"
 	"github.com/GoogleContainerTools/kaniko/pkg/util"
+	"github.com/containerd/containerd/platforms"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -69,10 +70,28 @@ func RetrieveSourceImage(stage config.KanikoStage, opts *config.KanikoOptions) (
 		return retrieveTarImage(stage.BaseImageIndex)
 	}
 
+	currentPlatform := stage.Platform
+	if currentPlatform == "" {
+		currentPlatform = opts.CustomPlatform
+	} else {
+		currentPlatform, err = util.ResolveEnvironmentReplacement(currentPlatform, opts.BuildArgs, false)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if currentPlatform != "" {
+		spec, err := platforms.Parse(currentPlatform)
+		if err != nil {
+			return nil, err
+		}
+		currentPlatform = platforms.Format(platforms.Normalize(spec))
+	}
+
 	// Finally, check if local caching is enabled
 	// If so, look in the local cache before trying the remote registry
 	if opts.Cache && opts.CacheDir != "" {
-		cachedImage, err := cachedImage(opts, currentBaseName)
+		cachedImage, err := cachedImage(opts, currentBaseName, currentPlatform)
 		if err != nil {
 			switch {
 			case cache.IsNotFound(err):
@@ -88,7 +107,7 @@ func RetrieveSourceImage(stage config.KanikoStage, opts *config.KanikoOptions) (
 	}
 
 	// Otherwise, initialize image as usual
-	return RetrieveRemoteImage(currentBaseName, opts.RegistryOptions, opts.CustomPlatform)
+	return RetrieveRemoteImage(currentBaseName, opts.RegistryOptions, currentPlatform)
 }
 
 func tarballImage(index int) (v1.Image, error) {
@@ -97,7 +116,7 @@ func tarballImage(index int) (v1.Image, error) {
 	return tarball.ImageFromPath(tarPath, nil)
 }
 
-func cachedImage(opts *config.KanikoOptions, image string) (v1.Image, error) {
+func cachedImage(opts *config.KanikoOptions, image string, platform string) (v1.Image, error) {
 	ref, err := name.ParseReference(image, name.WeakValidation)
 	if err != nil {
 		return nil, err
@@ -107,7 +126,7 @@ func cachedImage(opts *config.KanikoOptions, image string) (v1.Image, error) {
 	if d, ok := ref.(name.Digest); ok {
 		cacheKey = d.DigestStr()
 	} else {
-		image, err := remote.RetrieveRemoteImage(image, opts.RegistryOptions, opts.CustomPlatform)
+		image, err := remote.RetrieveRemoteImage(image, opts.RegistryOptions, platform)
 		if err != nil {
 			return nil, err
 		}

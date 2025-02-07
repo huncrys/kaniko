@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleContainerTools/kaniko/pkg/config"
 	"github.com/GoogleContainerTools/kaniko/pkg/fakes"
+	"github.com/google/go-cmp/cmp"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 )
 
@@ -47,7 +48,10 @@ func Test_Warmer_Warm_not_in_cache(t *testing.T) {
 
 	opts := &config.WarmerOptions{}
 
-	_, err := cw.Warm(image, opts)
+	_, err := cw.Warm(Image{
+		Reference: image,
+		Platform:  "",
+	}, opts)
 	if err != nil {
 		t.Errorf("expected error to be nil but was %v", err)
 		t.FailNow()
@@ -75,7 +79,10 @@ func Test_Warmer_Warm_in_cache_not_expired(t *testing.T) {
 
 	opts := &config.WarmerOptions{}
 
-	_, err := cw.Warm(image, opts)
+	_, err := cw.Warm(Image{
+		Reference: image,
+		Platform:  "",
+	}, opts)
 	if !IsAlreadyCached(err) {
 		t.Errorf("expected error to be already cached err but was %v", err)
 		t.FailNow()
@@ -103,7 +110,10 @@ func Test_Warmer_Warm_in_cache_expired(t *testing.T) {
 
 	opts := &config.WarmerOptions{}
 
-	_, err := cw.Warm(image, opts)
+	_, err := cw.Warm(Image{
+		Reference: image,
+		Platform:  "",
+	}, opts)
 	if !IsAlreadyCached(err) {
 		t.Errorf("expected error to be already cached err but was %v", err)
 		t.FailNow()
@@ -132,15 +142,19 @@ LABEL maintainer="alexezio"
 	}
 
 	opts := &config.WarmerOptions{DockerfilePath: tmpfile.Name()}
-	baseNames, err := ParseDockerfile(opts)
+	images, err := ParseDockerfile(opts)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(baseNames) != 1 {
-		t.Fatalf("expected 1 base name, got %d", len(baseNames))
+	if len(images) != 1 {
+		t.Fatalf("expected 1 image, got %d", len(images))
 	}
-	if baseNames[0] != "alpine:latest" {
-		t.Fatalf("expected 'alpine:latest', got '%s'", baseNames[0])
+	expected := Image{
+		Reference: "alpine:latest",
+		Platform:  "",
+	}
+	if !cmp.Equal(images[0], expected) {
+		t.Fatalf("expected '%v', got '%v'", expected, images[0])
 	}
 }
 
@@ -165,19 +179,29 @@ LABEL maintainer="alexezio"
 	}
 
 	opts := &config.WarmerOptions{DockerfilePath: tmpfile.Name()}
-	baseNames, err := ParseDockerfile(opts)
+	images, err := ParseDockerfile(opts)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(baseNames) != 2 {
-		t.Fatalf("expected 2 base name, got %d", len(baseNames))
+	if len(images) != 2 {
+		t.Fatalf("expected 2 image, got %d", len(images))
 	}
-	if baseNames[0] != "golang:1.20" {
-		t.Fatalf("expected 'golang:1.20', got '%s'", baseNames[0])
+	expected := []Image{
+		{
+			Reference: "golang:1.20",
+			Platform:  "",
+		},
+		{
+			Reference: "alpine:latest",
+			Platform:  "",
+		},
+	}
+	if !cmp.Equal(expected[0], images[0]) {
+		t.Fatalf("expected '%v', got '%v'", expected[0], images[0])
 	}
 
-	if baseNames[1] != "alpine:latest" {
-		t.Fatalf("expected 'alpine:latest', got '%s'", baseNames[0])
+	if !cmp.Equal(expected[1], images[1]) {
+		t.Fatalf("expected '%v', got '%v'", expected[1], images[1])
 	}
 }
 
@@ -199,15 +223,19 @@ FROM golang:${version}
 	}
 
 	opts := &config.WarmerOptions{DockerfilePath: tmpfile.Name(), BuildArgs: []string{"version=1.20"}}
-	baseNames, err := ParseDockerfile(opts)
+	images, err := ParseDockerfile(opts)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(baseNames) != 1 {
-		t.Fatalf("expected 1 base name, got %d", len(baseNames))
+	if len(images) != 1 {
+		t.Fatalf("expected 1 image, got %d", len(images))
 	}
-	if baseNames[0] != "golang:1.20" {
-		t.Fatalf("expected 'golang:1.20', got '%s'", baseNames[0])
+	expected := Image{
+		Reference: "golang:1.20",
+		Platform:  "",
+	}
+	if !cmp.Equal(images[0], expected) {
+		t.Fatalf("expected '%v', got '%v'", expected, images[0])
 	}
 }
 
