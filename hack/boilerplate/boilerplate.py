@@ -23,8 +23,8 @@ import re
 import sys
 
 
-SKIPPED_DIRS = ["Godeps", "third_party", ".git", "vendor", "examples", "testdata"]
-SKIPPED_FILES = ["install_golint.sh"]
+SKIPPED_DIRS = ["Godeps", "third_party", ".git", "vendor", "examples", "testdata", "deploy"]
+SKIPPED_FILES = ["install_golint.sh", "build-images.sh", "push-images.sh"]
 
 parser = argparse.ArgumentParser()
 parser.add_argument("filenames", help="list of files to check, all files if unspecified", nargs='*')
@@ -54,7 +54,7 @@ def get_refs():
 def file_passes(filename, refs, regexs):
     try:
         f = open(filename, 'r')
-    except:
+    except OSError:
         return False
 
     data = f.read()
@@ -147,7 +147,7 @@ def get_regexs():
     # Search for "YEAR" which exists in the boilerplate, but shouldn't in the real thing
     regexs["year"] = re.compile( 'YEAR' )
     # dates can be any year [2000-2099] company holder names can be anything
-    regexs["date"] = re.compile( '(20\d\d)' )
+    regexs["date"] = re.compile( r'(20\d\d)' )
     # strip // go:build \n\n build constraints
     regexs["go_build_constraints_go"] = re.compile(r"^(//go\:build.*)+\n", re.MULTILINE)
     # strip // +build \n\n build constraints
