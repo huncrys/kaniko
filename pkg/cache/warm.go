@@ -241,6 +241,9 @@ func ParseDockerfile(opts *config.WarmerOptions) ([]Image, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, fmt.Sprintf("resolving platform %s", s.Platform))
 		}
+		if resolvedPlatform == "" {
+			resolvedPlatform = opts.CustomPlatform
+		}
 		if s.BaseName != resolvedBaseName {
 			stages[i].BaseName = resolvedBaseName
 		}
