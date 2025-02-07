@@ -36,7 +36,10 @@ func ExampleWarmer_Warm() {
 
 	options := &config.WarmerOptions{}
 
-	digest, err := w.Warm("ubuntu:latest", options)
+	digest, err := w.Warm(Image{
+		Reference: "ubuntu:latest",
+		Platform:  "",
+	}, options)
 	if err != nil {
 		if !IsAlreadyCached(err) {
 			log.Fatal(err)
