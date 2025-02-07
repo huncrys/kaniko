@@ -27,7 +27,7 @@ copy_platform() {
 
     image=$(echo -n "$imagetag" | cut -d: -f1)
     tag=$(echo -n "$imagetag" | cut -d: -f2)
-    suffix=$(echo -n "$platform" | cut -d/ -f2- | tr -d /)
+    suffix=$(echo -n "$platform" | cut -d/ -f2-)
 
     crane copy \
         --platform "$platform" \
