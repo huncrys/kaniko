@@ -25,7 +25,18 @@ GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 ORG := github.com/GoogleContainerTools
 PROJECT := kaniko
-REGISTRY?=gcr.io/kaniko-project
+REGISTRY ?= olcr.io/kaniko
+DOCKERFILE ?= deploy/Dockerfile
+
+PLATFORM ?= linux/amd64 \
+			linux/386 \
+			linux/arm64 \
+			linux/arm/v7
+
+IMAGE?= kaniko-executor=executor:latest \
+		kaniko-debug=executor:debug \
+		kaniko-slim=executor:slim \
+		kaniko-warmer=warmer:latest
 
 REPOPATH ?= $(ORG)/$(PROJECT)
 VERSION_PACKAGE = $(REPOPATH)/pkg/version
@@ -93,21 +104,17 @@ integration-test-misc:
 
 .PHONY: k8s-executor-build-push
 k8s-executor-build-push:
-	DOCKER_BUILDKIT=1 docker build ${BUILD_ARG} --build-arg=GOARCH=$(GOARCH) --build-arg=TARGETOS=linux -t $(REGISTRY)/executor:latest -f deploy/Dockerfile --target kaniko-executor .
+	DOCKER_BUILDKIT=1 docker build ${BUILD_ARG} --build-arg=GOARCH=$(GOARCH) --build-arg=TARGETOS=linux -t $(REGISTRY)/executor:latest -f $(DOCKERFILE) --target kaniko-executor .
 	docker push $(REGISTRY)/executor:latest
 
 
 .PHONY: images
-images: DOCKER_BUILDKIT=1
 images:
-	docker build ${BUILD_ARG} --build-arg=TARGETARCH=$(GOARCH) --build-arg=TARGETOS=linux -t $(REGISTRY)/executor:latest -f deploy/Dockerfile --target kaniko-executor .
-	docker build ${BUILD_ARG} --build-arg=TARGETARCH=$(GOARCH) --build-arg=TARGETOS=linux -t $(REGISTRY)/executor:debug -f deploy/Dockerfile --target kaniko-debug .
-	docker build ${BUILD_ARG} --build-arg=TARGETARCH=$(GOARCH) --build-arg=TARGETOS=linux -t $(REGISTRY)/executor:slim -f deploy/Dockerfile --target kaniko-slim .
-	docker build ${BUILD_ARG} --build-arg=TARGETARCH=$(GOARCH) --build-arg=TARGETOS=linux -t $(REGISTRY)/warmer:latest -f deploy/Dockerfile --target kaniko-warmer .
+	@ PLATFORM="$(PLATFORM)" REGISTRY="$(REGISTRY)" IMAGE="$(IMAGE)" DOCKERFILE=$(DOCKERFILE) ./scripts/build-images.sh
 
 .PHONY: push
 push:
-	docker push $(REGISTRY)/executor:latest
-	docker push $(REGISTRY)/executor:debug
-	docker push $(REGISTRY)/executor:slim
-	docker push $(REGISTRY)/warmer:latest
+	@ PLATFORM="$(PLATFORM)" REGISTRY="$(REGISTRY)" IMAGE="$(IMAGE)" ./scripts/push-images.sh
+
+.PHONY: release
+release: images push
