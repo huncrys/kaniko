@@ -28,7 +28,6 @@ import (
 	"github.com/GoogleContainerTools/kaniko/pkg/config"
 	"github.com/GoogleContainerTools/kaniko/pkg/logging"
 	"github.com/GoogleContainerTools/kaniko/pkg/util"
-	"github.com/containerd/containerd/platforms"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/pkg/errors"
@@ -124,19 +123,10 @@ func addKanikoOptionsFlags() {
 	RootCmd.PersistentFlags().VarP(&opts.RegistryMaps, "registry-map", "", "Registry map of mirror to use as pull-through cache instead. Expected format is 'orignal.registry=new.registry;other-original.registry=other-remap.registry'")
 	RootCmd.PersistentFlags().VarP(&opts.RegistryMirrors, "registry-mirror", "", "Registry mirror to use as pull-through cache instead of docker.io. Set it repeatedly for multiple mirrors.")
 	RootCmd.PersistentFlags().BoolVarP(&opts.SkipDefaultRegistryFallback, "skip-default-registry-fallback", "", false, "If an image is not found on any mirrors (defined with registry-mirror) do not fallback to the default registry. If registry-mirror is not defined, this flag is ignored.")
-	RootCmd.PersistentFlags().StringVarP(&opts.CustomPlatform, "customPlatform", "", "", "Specify the build platform if different from the current host")
+	RootCmd.PersistentFlags().StringVarP(&opts.CustomPlatform, "customPlatform", "", config.DefaultPlatform(), "Specify the build platform if different from the current host")
 	RootCmd.PersistentFlags().StringVarP(&opts.DockerfilePath, "dockerfile", "d", "", "Path to the dockerfile to be cached. The kaniko warmer will parse and write out each stage's base image layers to the cache-dir. Using the same dockerfile path as what you plan to build in the kaniko executor is the expected usage.")
 	RootCmd.PersistentFlags().VarP(&opts.BuildArgs, "build-arg", "", "This flag should be used in conjunction with the dockerfile flag for scenarios where dynamic replacement of the base image is required.")
 
-	// Default the custom platform flag to our current platform, and validate it.
-	if opts.CustomPlatform == "" {
-		spec := platforms.Normalize(platforms.DefaultSpec())
-		// Fix for armhf
-		if spec.Architecture == "arm" && spec.Variant == "v8" {
-			spec.Variant = "v7"
-		}
-		opts.CustomPlatform = platforms.Format(spec)
-	}
 	if _, err := v1.ParsePlatform(opts.CustomPlatform); err != nil {
 		logrus.Fatalf("Invalid platform %q: %v", opts.CustomPlatform, err)
 	}
@@ -187,18 +177,29 @@ func resolveEnvironmentBuildArgs(arguments []string, resolver func(string) strin
 }
 
 // addTargetBuildArgs adds target build args to the arguments if they are not already present
-func addTargetBuildArgs(arguments []string, platform string) []string {
-	spec, err := v1.ParsePlatform(platform)
+func addTargetBuildArgs(arguments []string, targetPlatform string) []string {
+	targetSpec, err := v1.ParsePlatform(targetPlatform)
 	if err != nil {
-		logrus.Warnf("Error parsing platform %s: %v", platform, err)
+		logrus.Warnf("Error parsing platform %s: %v", targetPlatform, err)
+		return arguments
+	}
+
+	buildPlatform := config.DefaultPlatform()
+	buildSpec, err := v1.ParsePlatform(buildPlatform)
+	if err != nil {
+		logrus.Warnf("Error parsing platform %s: %v", buildPlatform, err)
 		return arguments
 	}
 
 	targetArgs := map[string]string{
-		"TARGETPLATFORM": platform,
-		"TARGETOS":       spec.OS,
-		"TARGETARCH":     spec.Architecture,
-		"TARGETVARIANT":  spec.Variant,
+		"BUILDPLATFORM":  buildPlatform,
+		"BUILDOS":        buildSpec.OS,
+		"BUILDARCH":      buildSpec.Architecture,
+		"BUILDVARIANT":   buildSpec.Variant,
+		"TARGETPLATFORM": targetPlatform,
+		"TARGETOS":       targetSpec.OS,
+		"TARGETARCH":     targetSpec.Architecture,
+		"TARGETVARIANT":  targetSpec.Variant,
 	}
 
 outer:

@@ -20,6 +20,7 @@ FROM --platform=$BUILDPLATFORM golang:1.22 AS builder
 WORKDIR /src
 
 # This arg is passed by docker buildx & contains the target CPU architecture (e.g., amd64, arm64, etc.)
+ARG TARGETPLATFORM
 ARG TARGETARCH
 ARG TARGETOS
 ARG TARGETVARIANT
@@ -58,7 +59,7 @@ RUN go install github.com/chrismellard/docker-credential-acr-env
 RUN \
   --mount=type=cache,target=/root/.cache/go-build \
   --mount=type=cache,target=/go/pkg \
-  make out/executor out/warmer
+  make DEFAULTPLATFORM=$TARGETPLATFORM out/executor out/warmer
 
 RUN mv /go/bin/*/docker-credential-* /kaniko/ || mv /go/bin/docker-credential-* /kaniko/
 

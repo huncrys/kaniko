@@ -39,10 +39,14 @@ IMAGE?= kaniko-executor=executor:latest \
 		kaniko-warmer=warmer:latest
 
 REPOPATH ?= $(ORG)/$(PROJECT)
+CONFIG_PACKAGE = $(REPOPATH)/pkg/config
 VERSION_PACKAGE = $(REPOPATH)/pkg/version
 
 GO_FILES := $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 GO_LDFLAGS := '-extldflags "-static"
+ifdef DEFAULTPLATFORM
+GO_LDFLAGS += -X $(CONFIG_PACKAGE).defaultPlatform=$(DEFAULTPLATFORM)
+endif
 GO_LDFLAGS += -X $(VERSION_PACKAGE).version=$(VERSION)
 GO_LDFLAGS += -w -s # Drop debugging symbols.
 GO_LDFLAGS += '
