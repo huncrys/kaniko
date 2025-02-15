@@ -56,6 +56,7 @@ GO_LDFLAGS += -w -s # Drop debugging symbols.
 GO_LDFLAGS += '
 
 EXECUTOR_PACKAGE = $(REPOPATH)/cmd/executor
+LOGIN_PACKAGE = $(REPOPATH)/cmd/login
 WARMER_PACKAGE = $(REPOPATH)/cmd/warmer
 KANIKO_PROJECT = $(REPOPATH)/kaniko
 BUILD_ARG ?=
@@ -68,6 +69,9 @@ export GOFLAGS = -mod=vendor
 
 out/executor: $(GO_FILES)
 	GOARCH=$(GOARCH) GOOS=$(GOOS) CGO_ENABLED=0 go build -ldflags $(GO_LDFLAGS) -o $@ $(EXECUTOR_PACKAGE)
+
+out/login: $(GO_FILES)
+	GOARCH=$(GOARCH) GOOS=$(GOOS) CGO_ENABLED=0 go build -ldflags $(GO_LDFLAGS) -o $@ $(LOGIN_PACKAGE)
 
 out/warmer: $(GO_FILES)
 	GOARCH=$(GOARCH) GOOS=$(GOOS) CGO_ENABLED=0 go build -ldflags $(GO_LDFLAGS) -o $@ $(WARMER_PACKAGE)

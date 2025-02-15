@@ -59,7 +59,7 @@ RUN go install github.com/chrismellard/docker-credential-acr-env
 RUN \
   --mount=type=cache,target=/root/.cache/go-build \
   --mount=type=cache,target=/go/pkg \
-  make DEFAULTPLATFORM=$TARGETPLATFORM out/executor out/warmer
+  make DEFAULTPLATFORM=$TARGETPLATFORM out/executor out/login out/warmer
 
 RUN mv /go/bin/*/docker-credential-* /kaniko/ || mv /go/bin/docker-credential-* /kaniko/
 
@@ -86,6 +86,7 @@ ENV \
 FROM kaniko-base-slim AS kaniko-base
 
 COPY --from=builder --chown=0:0 /kaniko/ /kaniko/
+COPY --from=builder /src/out/login /kaniko/login
 
 ENV \
   DOCKER_CONFIG=/kaniko/.docker/ \
