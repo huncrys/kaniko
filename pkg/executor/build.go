@@ -782,6 +782,9 @@ func DoBuild(opts *config.KanikoOptions) (v1.Image, error) {
 				configFile.Variant = components[2]
 			}
 		}
+		if !stage.Final {
+			configFile.Config.Labels = map[string]string{}
+		}
 		sourceImage, err = mutate.ConfigFile(sourceImage, configFile)
 		if err != nil {
 			return nil, err
