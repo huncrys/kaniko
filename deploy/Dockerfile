@@ -56,6 +56,9 @@ RUN go install github.com/awslabs/amazon-ecr-credential-helper/ecr-login/cli/doc
 # Get ACR docker env credential helper
 RUN go install github.com/chrismellard/docker-credential-acr-env
 
+# Get docker generic environment credential helper
+RUN go install github.com/isometry/docker-credential-env
+
 RUN \
   --mount=type=cache,target=/root/.cache/go-build \
   --mount=type=cache,target=/go/pkg \
