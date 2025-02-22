@@ -38,6 +38,7 @@ require (
 	github.com/GoogleCloudPlatform/docker-credential-gcr/v2 v2.1.22
 	github.com/containerd/containerd v1.7.20
 	github.com/containerd/platforms v0.2.1
+	github.com/isometry/docker-credential-env v1.3.0
 )
 
 require github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
@@ -79,7 +80,7 @@ require (
 	github.com/containerd/fifo v1.1.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.15.1 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
-	github.com/docker/cli v26.1.4+incompatible // indirect
+	github.com/docker/cli v26.1.4+incompatible
 	github.com/docker/distribution v2.8.2+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.8.1 // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
@@ -166,7 +167,6 @@ require (
 	github.com/google/s2a-go v0.1.7 // indirect
 	github.com/google/subcommands v1.2.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
-	github.com/isometry/docker-credential-env v1.3.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect

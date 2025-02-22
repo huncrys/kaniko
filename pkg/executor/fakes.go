@@ -50,7 +50,6 @@ type MockDockerCommand struct {
 	contextFiles        []string
 	cacheCommand        commands.DockerCommand
 	argToCompositeCache bool
-	considerExcludedFiles bool
 }
 
 func (m MockDockerCommand) ExecuteCommand(c *v1.Config, args *dockerfile.BuildArgs) error { return nil }
@@ -89,8 +88,8 @@ func (m MockDockerCommand) IsConsiderExcludedFilesInCache() bool {
 }
 
 type MockCachedDockerCommand struct {
-	contextFiles        []string
-	argToCompositeCache bool
+	contextFiles          []string
+	argToCompositeCache   bool
 	considerExcludedFiles bool
 }
 

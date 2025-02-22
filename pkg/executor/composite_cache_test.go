@@ -544,7 +544,7 @@ func Test_CompositeCache_AddPath_DiffFileNames_Cache_Differently_Works(t *testin
 
 	fn := func(p string) string {
 		r := NewCompositeCache()
-		if err := r.AddPath(p, util.FileContext{Root: p}); err != nil {
+		if err := r.AddPath(p, util.FileContext{Root: p}, false); err != nil {
 			t.Errorf("expected error to be nil but was %v", err)
 		}
 
@@ -581,7 +581,7 @@ func Test_CompositeCache_AddPath_SameFileNames_In_Diff_Contexts_Works(t *testing
 
 	fn := func(p string) string {
 		r := NewCompositeCache()
-		if err := r.AddPath(p, util.FileContext{Root: p}); err != nil {
+		if err := r.AddPath(p, util.FileContext{Root: p}, false); err != nil {
 			t.Errorf("expected error to be nil but was %v", err)
 		}
 

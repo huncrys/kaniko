@@ -666,6 +666,9 @@ func CalculateDependencies(stages []config.KanikoStage, opts *config.KanikoOptio
 		}
 
 		cmds, err := dockerfile.GetOnBuildInstructions(&cfg.Config, stageNameToIdx)
+		if err != nil {
+			return nil, err
+		}
 		cmds = append(cmds, s.Commands...)
 
 		for _, c := range cmds {

@@ -87,9 +87,6 @@ func setupTestTemp(t *testing.T) string {
 				return err
 			}
 			if path != srcPath {
-				if err != nil {
-					return err
-				}
 				tempPath := strings.TrimPrefix(path, srcPath)
 				fileInfo, err := os.Stat(path)
 				if err != nil {

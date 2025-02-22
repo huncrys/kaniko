@@ -204,7 +204,7 @@ func DoPush(image v1.Image, opts *config.KanikoOptions) error {
 			return errors.Wrap(err, "appending image")
 		}
 	}
-	
+
 	if opts.NoPush && len(opts.Destinations) == 0 {
 		if opts.TarPath != "" {
 			setDummyDestinations(opts)
@@ -353,7 +353,7 @@ func writeImageOutputs(image v1.Image, destRefs []name.Tag) error {
 // if opts.CacheRepo doesn't exist, infer the cache from the given destination
 func pushLayerToCache(opts *config.KanikoOptions, cacheKey string, tarPath string, createdBy string) error {
 	var layerOpts []tarball.LayerOption
-	if opts.CompressedCaching == true {
+	if opts.CompressedCaching {
 		layerOpts = append(layerOpts, tarball.WithCompressedCaching)
 	}
 
@@ -368,7 +368,6 @@ func pushLayerToCache(opts *config.KanikoOptions, cacheKey string, tarPath strin
 	case config.GZip:
 		// layer already gzipped by default
 	}
-
 
 	cache, err := cache.Destination(opts, cacheKey)
 	if err != nil {
